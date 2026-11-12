@@ -1,6 +1,5 @@
-import member_repository
-import loan_repository
-import loan_service
+from repositories import loan_repository, member_repository
+from services import loan_service
 import validation
 from errors import bad_request, conflict, not_found
 from fines import money

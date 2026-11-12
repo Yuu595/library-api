@@ -2,10 +2,7 @@ import os
 
 from flask import Flask, jsonify
 
-import book_routes
-import loan_routes
-import member_routes
-import report_routes
+from routes import book_routes, loan_routes, member_routes, report_routes
 from db import init_db
 from errors import LibraryError
 

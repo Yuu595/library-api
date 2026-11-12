@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-import loan_service
+from services import loan_service
 from fines import money
 
 bp = Blueprint("loans", __name__)

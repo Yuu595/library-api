@@ -22,6 +22,7 @@ Route        reads the request, returns JSON
   ↓
 Service      applies the library's rules
   ↓
+
 Repository   runs the SQL
   ↓
 Database
