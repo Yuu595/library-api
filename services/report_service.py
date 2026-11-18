@@ -1,6 +1,6 @@
 from repositories import book_repository, loan_repository, report_repository
 from services import loan_service
-from fines import days_late, fine_for, money
+from utils.fines import days_late, fine_for, money
 
 
 def overdue_report():

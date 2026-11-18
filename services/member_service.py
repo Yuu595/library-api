@@ -1,8 +1,8 @@
 from repositories import loan_repository, member_repository
 from services import loan_service
-import validation
+from utils import validation
 from errors import bad_request, conflict, not_found
-from fines import money
+from utils.fines import money
 
 
 def list_members():
@@ -17,7 +17,7 @@ def get_member(member_id):
 
 
 def create_member(data):
-    if not data.get("name"):
+    if not validation.has_required_fields(data, ("name",)):
         raise bad_request("name is required")
     if not validation.is_valid_email(data.get("email")):
         raise bad_request("invalid email")

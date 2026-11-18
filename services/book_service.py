@@ -1,5 +1,5 @@
 from repositories import book_repository
-import validation
+from utils import checks, validation
 from errors import bad_request, conflict, not_found
 
 
@@ -15,7 +15,7 @@ def get_book(book_id):
 
 
 def create_book(data):
-    if not data.get("title") or not data.get("author"):
+    if not validation.has_required_fields(data, ("title", "author")):
         raise bad_request("title and author are required")
     if not validation.is_valid_isbn(data.get("isbn")):
         raise bad_request("invalid isbn")
@@ -24,6 +24,6 @@ def create_book(data):
 
 def delete_book(book_id):
     book = get_book(book_id)
-    if book["available"] == 0:
+    if not checks.is_book_available(book):
         raise conflict("book is on loan")
     book_repository.delete_book(book_id)

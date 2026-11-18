@@ -1,14 +1,13 @@
 from datetime import date, timedelta
 
 from repositories import book_repository, loan_repository, member_repository
-import notifications
-import validation
+from notifications import send_due_date_reminder, send_email, send_overdue_notice
 from errors import bad_request, conflict, not_found
-from fines import fine_for, money
+from utils import checks, validation
+from utils.checks import STAFF_LOAN_LIMIT, STUDENT_LOAN_LIMIT
+from utils.fines import fine_for, money
 
 LOAN_DURATION_DAYS = 14
-STUDENT_LOAN_LIMIT = 3
-STAFF_LOAN_LIMIT = 5
 MAX_RENEWALS = 1
 
 
@@ -35,7 +34,7 @@ def current_fine(loan):
 
 
 def is_overdue(loan):
-    return loan["returned"] == 0 and fine_for(loan["due_date"]) > 0
+    return checks.is_loan_overdue(loan)
 
 
 def list_loans(only_overdue):
@@ -53,7 +52,7 @@ def get_loan(loan_id):
 
 
 def create_loan(data):
-    if not data.get("book_id") or not data.get("member_id"):
+    if not validation.has_required_fields(data, ("book_id", "member_id")):
         raise bad_request("book_id and member_id are required")
     if data.get("due_date") and not validation.is_valid_date(data["due_date"]):
         raise bad_request("invalid due_date")
@@ -64,14 +63,13 @@ def create_loan(data):
     member = member_repository.get_member(data["member_id"])
     if member is None:
         raise not_found("member not found")
-    if book["available"] == 0:
+    if not checks.is_book_available(book):
         raise conflict("book is not available")
 
     loans = loan_repository.list_loans_for_member(data["member_id"])
-    if total_owed(loans) > 0:
+    if checks.has_unpaid_fines(total_owed(loans)):
         raise conflict("member has unpaid fines")
-    limit = STAFF_LOAN_LIMIT if member["type"] == "staff" else STUDENT_LOAN_LIMIT
-    if count_open_loans(loans) >= limit:
+    if checks.has_reached_borrowing_limit(count_open_loans(loans), member["type"]):
         raise conflict("loan limit reached")
 
     today = date.today()
@@ -79,7 +77,8 @@ def create_loan(data):
     loan = loan_repository.create_loan(
         data["book_id"], data["member_id"], due_date, today.isoformat()
     )
-    notifications.send_email(member["email"], "Book checked out", "You checked out " + book["title"])
+    send_due_date_reminder(member, loan)
+    send_email(member["email"], "Book checked out", "You checked out " + book["title"])
     return loan
 
 
@@ -92,7 +91,9 @@ def return_book(loan_id):
     updated = loan_repository.mark_returned(loan_id, loan["book_id"], fine)
     member = member_repository.get_member(loan["member_id"])
     book = book_repository.get_book(loan["book_id"])
-    notifications.send_email(
+    if fine > 0:
+        send_overdue_notice(member, updated)
+    send_email(
         member["email"], "Book returned", "You returned " + book["title"] + ". Fine: $" + str(money(fine))
     )
     return updated
@@ -111,7 +112,7 @@ def renew_loan(loan_id):
     updated = loan_repository.extend_loan(loan_id, new_due_date)
     member = member_repository.get_member(loan["member_id"])
     book = book_repository.get_book(loan["book_id"])
-    notifications.send_email(member["email"], "Loan renewed", "You renewed " + book["title"])
+    send_email(member["email"], "Loan renewed", "You renewed " + book["title"])
     return updated
 
 
@@ -124,7 +125,7 @@ def pay_fine(loan_id):
 
     updated = loan_repository.mark_fine_paid(loan_id)
     member = member_repository.get_member(loan["member_id"])
-    notifications.send_email(
+    send_email(
         member["email"], "Fine paid", "We received $" + str(money(loan["fine"]))
     )
     return updated
